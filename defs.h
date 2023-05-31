@@ -10,8 +10,8 @@
 
 typedef struct hash_map //cvor unutar trie strukture
 {
-    char* key; // reč
-    int value; // trenutna frekvencija
+    char* word; // reč
+    unsigned int hash; // trenutna frekvencija
 } hash_map;
 
 typedef struct search_result //rezultat pretrage

@@ -1,22 +1,13 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
+#include <malloc.h>
 #include "defs.h"
 
 pthread_mutex_t fileMutex;
 
 int fileChanged(char* fileName);
-
-
-int countChars(char* word){
-
-    int count = 0;
-    while (word[count] != ' ') {
-        count++;
-    }
-    return count;
-
-}
+void my_strtok(char* str, const char* delimiters, char* words[]);
 
 int countElements(char* arr[]) {
     int count = 0;
@@ -54,18 +45,28 @@ unsigned long hash_djb2(char* str) {  /// implemented a djb2 algorithm for hashi
 }
 
 void putFile(char* filePath, char* input){     // uzima samo poslednje uneto za fileName
-    /// PAZI! strtok menja inicijalni string!
-    char* token = strtok(input, " ");
-    char* tokens[100];
-    int count = 0;
+
+    char* delimiters = " ";
+    char* words[BUFFER_SIZE];
+    my_strtok(input, delimiters, words);
+
+    int size = countElements(words);
+
+    strcpy(filePath, words[--size]);
+}
+
+void my_strtok(char* str, const char* delimiters, char** words) {
+    int numWords = 0;
+    char helpStr[BUFFER_SIZE];
+    strcpy(helpStr, str);
+    char* token = strtok(helpStr, delimiters);
 
     while (token != NULL) {
-        tokens[count++] = token;
-        token = strtok(NULL, " ");
+        words[numWords] = (char*)malloc(strlen(token) + 1);
+        words[numWords] = strdup(token);
+        numWords++;
+        token = strtok(NULL, delimiters);
     }
-
-    strcpy(filePath, tokens[--count]);
-
 }
 
 
@@ -87,9 +88,45 @@ void *scanner_work(void *_args){ //funkcija scanner niti,
         scannedFile->buffer[bytesRead] = '\0';  // Add null terminator
     }
 
+
+    ///mapping
     char helpBuf[BUFFER_SIZE];
     strcpy(helpBuf, scannedFile->buffer);
 
+    const char delimiters[] = " \t\n";
+
+    char* store[BUFFER_SIZE];
+
+    my_strtok(helpBuf, delimiters, store);
+
+    int numElements = countElements(store);
+
+    // Create an array of hash_map structures
+    hash_map* map = (hash_map*)malloc(numElements * sizeof(hash_map));
+    if (map == NULL) {
+        fprintf(stderr, "Failed to allocate memory for hash_map\n");
+        return NULL;
+    }
+
+
+    for (int i = 0; i < numElements; i++) {
+        // Allocate memory for the word
+
+        map[i].word = strdup(store[i]);
+        if (map[i].word == NULL) {
+            fprintf(stderr, "Failed to allocate memory for word\n");
+            break;
+        }
+
+        // Assign the hash value
+        map[i].hash = hash_djb2(store[i]);
+    }
+
+
+    // Print the hash_map array
+    for (int i = 0; i < numElements; i++) {
+        printf("Word: %s, Hash: %d\n", map[i].word, map[i].hash);
+    }
 
 
 
@@ -165,10 +202,6 @@ int main() {
             strcpy(scannedFile.file_name, filePath);
             strcpy(scannedFile.buffer, fileData);
 
-            if (pthread_mutex_init(&fileMutex, NULL) != 0) {  /// mutex initialization
-                fprintf(stderr, "Failed to initialize mutex\n");
-                return 1;
-            }
 
             if (pthread_create(&scanTh, NULL, scanner_work, (void*)&scannedFile) != 0) {
                 fprintf(stderr, "Failed to create the thread.\n");
