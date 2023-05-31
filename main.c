@@ -1,13 +1,7 @@
-#include <stdio.h>
-#include <pthread.h>
-#include <string.h>
-#include <malloc.h>
 #include "defs.h"
 
 pthread_mutex_t fileMutex;
 
-int fileChanged(char* fileName);
-void my_strtok(char* str, const char* delimiters, char* words[]);
 
 int countElements(char* arr[]) {
     int count = 0;
@@ -69,8 +63,24 @@ void my_strtok(char* str, const char* delimiters, char** words) {
     }
 }
 
+int isValidWord(char* word){
 
-void *scanner_work(void *_args){ //funkcija scanner niti,
+    for(int i = 0; word[i] != '\0'; i++){
+        if(!isalpha(word[i])){
+            return -1;
+        }
+    }
+
+    for(int i = 0; word[i] != '\0'; i++) {  //uslov za 64
+        word[i] = tolower(word[i]);
+    }
+
+    return 8;
+
+}
+
+
+void *scanner_work(void *_args){ //funkcija scanner niti
 
     scanned_file* scannedFile = (scanned_file*) _args;
 
@@ -94,7 +104,6 @@ void *scanner_work(void *_args){ //funkcija scanner niti,
     strcpy(helpBuf, scannedFile->buffer);
 
     const char delimiters[] = " \t\n";
-
     char* store[BUFFER_SIZE];
 
     my_strtok(helpBuf, delimiters, store);
@@ -112,14 +121,17 @@ void *scanner_work(void *_args){ //funkcija scanner niti,
     for (int i = 0; i < numElements; i++) {
         // Allocate memory for the word
 
-        map[i].word = strdup(store[i]);
-        if (map[i].word == NULL) {
-            fprintf(stderr, "Failed to allocate memory for word\n");
-            break;
-        }
+        if(isValidWord(store[i]) == 8) {  // ne zanm kako da mu kazem da ne upisuje null-ove
+            map[i].word = strdup(store[i]);
 
-        // Assign the hash value
-        map[i].hash = hash_djb2(store[i]);
+            if (map[i].word == NULL) {
+                fprintf(stderr, "Failed to allocate memory for word\n");
+                break;
+            }
+
+            // Assign the hash value
+            map[i].hash = hash_djb2(store[i]);
+        }
     }
 
 
