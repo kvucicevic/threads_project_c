@@ -42,6 +42,33 @@ int container(char* input){  /// koji je mode
 
 }
 
+unsigned long hash_djb2(char* str) {  /// implemented a djb2 algorithm for hashing a string
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++)) {
+        hash = ((hash << 5) + hash) + c; // hash * 33 + c
+    }
+
+    return hash;
+}
+
+void putFile(char* filePath, char* input){     // uzima samo poslednje uneto za fileName
+    /// PAZI! strtok menja inicijalni string!
+    char* token = strtok(input, " ");
+    char* tokens[100];
+    int count = 0;
+
+    while (token != NULL) {
+        tokens[count++] = token;
+        token = strtok(NULL, " ");
+    }
+
+    strcpy(filePath, tokens[--count]);
+
+}
+
+
 void *scanner_work(void *_args){ //funkcija scanner niti,
 
     scanned_file* scannedFile = (scanned_file*) _args;
@@ -59,6 +86,10 @@ void *scanner_work(void *_args){ //funkcija scanner niti,
     if (bytesRead > 0) {
         scannedFile->buffer[bytesRead] = '\0';  // Add null terminator
     }
+
+    char helpBuf[BUFFER_SIZE];
+    strcpy(helpBuf, scannedFile->buffer);
+
 
 
 
@@ -84,21 +115,6 @@ void *scanner_work(void *_args){ //funkcija scanner niti,
 
 
     return NULL;
-}
-
-void putFile(char* filePath, char* input){     // uzima samo poslednje uneto za fileName
-                                                /// PAZI! strtok menja inicijalni string!
-    char* token = strtok(input, " ");
-    char* tokens[100];
-    int count = 0;
-
-    while (token != NULL) {
-        tokens[count++] = token;
-        token = strtok(NULL, " ");
-    }
-
-    strcpy(filePath, tokens[--count]);
-
 }
 
 int fileChanged(char* fileName){
