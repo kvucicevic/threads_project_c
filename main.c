@@ -83,18 +83,53 @@ int isValidWord(char* word){
 }
 
 void map_add_word_count(char *word, map_result* map, int mapSize){
-    for (int i = 0; i < mapSize; i++) {
-        if (strcmp(word, map[i].word) == 0) {
-            map[i].frequency++;
-            printf("mapi %s, mapifreq: %d\n", map[i].word, map[i].frequency);
-            return;
+
+    hash_map* hashMap = mapFiles[fileCounter].hashMap;
+
+    for (int i = 0; i < mapSize; i++) {   /// size of hashmap
+        // Check if the word already exists in the frequency map
+        int found = 0;
+        for (int j = 0; j < mapSize; j++) {   /// size of freqmap
+            if (strcmp(hashMap[i].word, word) == 0) {
+                map[j].frequency++;
+                found = 1;
+                break;
+            }
+        }
+
+        // If the word doesn't exist in the frequency map, add a new entry
+        if (!found) {
+            map[mapSize].word = strdup(map[i].word);   /// maybe here should be just word
+            map[mapSize].frequency = 1;
+            map->maxSize = mapSize;
         }
     }
+}
 
-    // Word not found in the map, add a new entry
-    map[mapSize].word = strdup(word);
-    map[mapSize].frequency = 1;
-    map->maxSize = mapSize;
+int fileChanged(char* fileName, time_t previousTimestamp){
+
+    struct stat fileStat;
+
+    if (stat(fileName, &fileStat) == -1) {
+        // Error occurred while getting file information
+        perror("stat");
+        return -1;
+    }
+
+    // Initialize the previous timestamp on the first call
+    if (previousTimestamp == 0) {
+        previousTimestamp = fileStat.st_mtime;
+        return 5;  // File has not changed (initial check)
+    }
+
+    // Check if the modification timestamp has changed
+    if (fileStat.st_mtime != previousTimestamp) {
+        previousTimestamp = fileStat.st_mtime;
+        return 8;  // File has changed
+    }
+
+    return 5;  // File has not changed
+
 }
 
 hash_map* hashmapper(char* source){
@@ -151,6 +186,17 @@ void *scanner_work(void *_args){ //funkcija scanner niti
 
     printf("File is: %s\n", scannedFile->file_name);
 
+    struct stat fileInfo;
+
+    // Get the file information
+    if (stat(scannedFile->file_name, &fileInfo) == -1) {
+        // Error occurred while getting file information
+        perror("stat");
+        return NULL;
+    }
+
+    scannedFile->mod_time = fileInfo.st_mtime;
+
     size_t bytesRead = fread(scannedFile->buffer, sizeof(char), BUFFER_SIZE - 1, file);
     if (bytesRead > 0) {
         scannedFile->buffer[bytesRead] = '\0';  // Add null terminator
@@ -171,10 +217,10 @@ void *scanner_work(void *_args){ //funkcija scanner niti
         printf("Word: %s, Hash: %d, Size: %d \n", map[j].word, map[j].hash, map->size);
     }
 
-    /*
+
     while(1){
         pthread_mutex_lock(&fileMutex);
-        if (fileChanged(scannedFile->file_name) == 8) {
+        if (fileChanged(scannedFile->file_name, scannedFile->mod_time) == 8) {
             // Perform file iteration and mapping again
             printf("ye");
         }
@@ -184,7 +230,7 @@ void *scanner_work(void *_args){ //funkcija scanner niti
         // Sleep for 5 seconds
         sleep(5);
     }
-     */
+
 
     fclose(file);
 
@@ -195,37 +241,12 @@ void *scanner_work(void *_args){ //funkcija scanner niti
     return NULL;
 }
 
-int fileChanged(char* fileName){
-
-    struct stat fileStat;
-    if (stat(fileName, &fileStat) == -1) {
-        perror("Failed to get file status");
-        return -1;
-    }
-
-    time_t previousModTime = fileStat.st_mtime;
-
-    if (stat(fileName, &fileStat) == -1) {
-        perror("Failed to get file status");
-        return -1;
-    }
-
-    time_t currentModTime = fileStat.st_mtime;
-
-    if (currentModTime != previousModTime) {
-        return 8;   /// file has changed
-    } else {
-        return 5;   /// file has NOT changed
-    }
-
-}
 
 void *map_get_frequency(void* args){
 
 
-    hash_map* hashMap = mapFiles[fileCounter++].hashMap;
+    hash_map* hashMap = mapFiles[fileCounter].hashMap;
     char* word = (char*) args;
-
 
     map_result* map = (map_result*)malloc(BUFFER_SIZE * sizeof(map_result));
     if (map == NULL) {

@@ -47,7 +47,7 @@ extern unsigned long hash_djb2(char* str);
 extern void putFile(char* filePath, char* input);
 extern void my_strtok(char* str, const char* delimiters, char* words[]);
 extern int isValidWord(char* word);
-extern int fileChanged(char* fileName);
+extern int fileChanged(char* fileName, time_t previousTimestamp);
 
 
 
