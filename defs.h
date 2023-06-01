@@ -13,21 +13,29 @@
 #define BUFFER_SIZE 4096
 
 
-typedef struct hash_map //cvor unutar trie strukture
+typedef struct hash_map
 {
     char* word; // reč
-    unsigned int hash; // trenutna frekvencija
+    unsigned int hash;
+    int size;
 } hash_map;
 
-typedef struct search_result //rezultat pretrage
+typedef struct map_result //rezultat pretrage
 {
-    char* key; // reč
-    int value; // trenutna frekvencija
-} search_result;
+    char* word; // reč
+    int frequency; // trenutna frekvencija
+    int maxSize;
+} map_result;
 
-typedef struct scanned_file //datoteka koju je scanner vec skenirao
+typedef struct map_file
 {
-    char file_name[30]; //naziv datoteke
+    hash_map* hashMap;
+    char fileName[MAX_WORD_LEN];
+} map_file;
+
+typedef struct scanned_file //fajl koji je scanner vec skenirao
+{
+    char file_name[30]; //naziv
     char buffer[BUFFER_SIZE];  //podaci iz fajla
     time_t mod_time; //vreme poslednje modifikacije datoteke
 } scanned_file;
@@ -48,6 +56,6 @@ extern void *scanner_work(void *_args); //funkcija scanner niti
 
 extern void map_init(); //poziva se jednom na pocetku rada sistema
 
-extern void map_add_word_count(char *word, int value); //operacija za dodavanje reci i njihove frekvencije
-extern search_result *map_get_frequency(char *word); //operacija za pretragu
+extern void map_add_word_count(char *word, map_result* map, int map_size); //operacija za dodavanje reci i njihove frekvencije
+extern void *map_get_frequency(void* args); //operacija za pretragu
 extern void add_stopword(char* word); //dodaje rec u niz stop reci

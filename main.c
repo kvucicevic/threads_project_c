@@ -2,6 +2,9 @@
 
 pthread_mutex_t fileMutex;
 
+map_file mapFiles[LETTERS];
+int fileCounter = 0;
+
 
 int countElements(char* arr[]) {
     int count = 0;
@@ -79,6 +82,61 @@ int isValidWord(char* word){
 
 }
 
+void map_add_word_count(char *word, map_result* map, int mapSize){
+    for (int i = 0; i < mapSize; i++) {
+        if (strcmp(word, map[i].word) == 0) {
+            map[i].frequency++;
+            printf("mapi %s, mapifreq: %d\n", map[i].word, map[i].frequency);
+            return;
+        }
+    }
+
+    // Word not found in the map, add a new entry
+    map[mapSize].word = strdup(word);
+    map[mapSize].frequency = 1;
+    map->maxSize = mapSize;
+}
+
+hash_map* hashmapper(char* source){
+    char helpBuf[BUFFER_SIZE];
+    strcpy(helpBuf, source);
+
+    const char delimiters[] = " \t\n";
+    char* store[BUFFER_SIZE];
+
+    my_strtok(helpBuf, delimiters, store);
+
+    int numElements = countElements(store);
+
+    // Create an array of hash_map structures
+    hash_map* map = (hash_map*)malloc(numElements * sizeof(hash_map));
+    if (map == NULL) {
+        fprintf(stderr, "Failed to allocate memory for hash_map\n");
+        return NULL;
+    }
+
+
+    int i;
+    for (i = 0; i < numElements; i++) {
+        // Allocate memory for the word
+
+        if(isValidWord(store[i]) == 8) {  // ne znam kako da mu kazem da ne upisuje null-ove
+            map[i].word = strdup(store[i]);
+
+            if (map[i].word == NULL) {
+                fprintf(stderr, "Failed to allocate memory for word\n");
+                break;
+            }
+
+            // Assign the hash value
+            map[i].hash = hash_djb2(store[i]);
+        }
+
+    }
+    map->size = i;
+
+    return map;
+}
 
 void *scanner_work(void *_args){ //funkcija scanner niti
 
@@ -100,47 +158,18 @@ void *scanner_work(void *_args){ //funkcija scanner niti
 
 
     ///mapping
-    char helpBuf[BUFFER_SIZE];
-    strcpy(helpBuf, scannedFile->buffer);
+    hash_map* map = hashmapper(scannedFile->buffer);
 
-    const char delimiters[] = " \t\n";
-    char* store[BUFFER_SIZE];
+    map_file mapFile;
+    mapFile.hashMap = map;
+    strcpy(mapFile.fileName, scannedFile->file_name);
 
-    my_strtok(helpBuf, delimiters, store);
-
-    int numElements = countElements(store);
-
-    // Create an array of hash_map structures
-    hash_map* map = (hash_map*)malloc(numElements * sizeof(hash_map));
-    if (map == NULL) {
-        fprintf(stderr, "Failed to allocate memory for hash_map\n");
-        return NULL;
-    }
-
-
-    for (int i = 0; i < numElements; i++) {
-        // Allocate memory for the word
-
-        if(isValidWord(store[i]) == 8) {  // ne zanm kako da mu kazem da ne upisuje null-ove
-            map[i].word = strdup(store[i]);
-
-            if (map[i].word == NULL) {
-                fprintf(stderr, "Failed to allocate memory for word\n");
-                break;
-            }
-
-            // Assign the hash value
-            map[i].hash = hash_djb2(store[i]);
-        }
-    }
-
+    mapFiles[fileCounter] = mapFile;
 
     // Print the hash_map array
-    for (int i = 0; i < numElements; i++) {
-        printf("Word: %s, Hash: %d\n", map[i].word, map[i].hash);
+    for (int j = 0; j < map->size; j++) {
+        printf("Word: %s, Hash: %d, Size: %d \n", map[j].word, map[j].hash, map->size);
     }
-
-
 
     /*
     while(1){
@@ -191,6 +220,33 @@ int fileChanged(char* fileName){
 
 }
 
+void *map_get_frequency(void* args){
+
+
+    hash_map* hashMap = mapFiles[fileCounter++].hashMap;
+    char* word = (char*) args;
+
+
+    map_result* map = (map_result*)malloc(BUFFER_SIZE * sizeof(map_result));
+    if (map == NULL) {
+        fprintf(stderr, "Failed to allocate memory for frequency map\n");
+        return NULL;
+    }
+
+    for (int i = 0; i < hashMap->size; i++) {
+        map[i].word = strdup(hashMap[i].word);
+        map[i].frequency = 0;
+    }
+
+    map->maxSize = hashMap->size;
+
+    map_add_word_count(word, map, hashMap->size);
+
+    printf("word is: %s , frequency is %d\n", word, map->frequency);
+
+    return map;
+
+}
 
 int main() {
 
@@ -206,13 +262,14 @@ int main() {
 
         putFile(filePath, input);
 
+        scanned_file scannedFile;
+        strcpy(scannedFile.file_name, filePath);
+        strcpy(scannedFile.buffer, fileData);
+
         pthread_t scanTh;
+        pthread_t mapTh;
 
         if (container(input) == 5) {
-
-            scanned_file scannedFile;
-            strcpy(scannedFile.file_name, filePath);
-            strcpy(scannedFile.buffer, fileData);
 
 
             if (pthread_create(&scanTh, NULL, scanner_work, (void*)&scannedFile) != 0) {
@@ -229,6 +286,20 @@ int main() {
             pthread_mutex_destroy(&fileMutex);
             printf("Contents of the file:\n%s\n", scannedFile.buffer);
 
+        } else if(container(input) == 8){
+
+
+
+            if (pthread_create(&mapTh, NULL, map_get_frequency, (void*)&input) != 0) {
+                fprintf(stderr, "Failed to create the thread.\n");
+                return 1;
+            }
+
+            // Wait for the thread to finish
+            if (pthread_join(mapTh, NULL) != 0) {
+                fprintf(stderr, "Failed to join the thread.\n");
+                return 1;
+            }
         }
 
         printf("Command: ");
