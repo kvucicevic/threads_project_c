@@ -1,9 +1,13 @@
 #include "defs.h"
 
 pthread_mutex_t fileMutex;
+pthread_cond_t cond;
+int isChanged = 0;
 
 map_file mapFiles[LETTERS];
 int fileCounter = 0;
+
+int mapInitialized = 0;
 
 
 int countElements(char* arr[]) {
@@ -124,6 +128,7 @@ int fileChanged(char* fileName, time_t previousTimestamp){
 
     // Check if the modification timestamp has changed
     if (fileStat.st_mtime != previousTimestamp) {
+        isChanged = 1;
         previousTimestamp = fileStat.st_mtime;
         return 8;  // File has changed
     }
@@ -175,6 +180,10 @@ hash_map* hashmapper(char* source){
 
 void *scanner_work(void *_args){ //funkcija scanner niti
 
+    if(isChanged == 1){
+        isChanged = 0;
+    }
+
     scanned_file* scannedFile = (scanned_file*) _args;
 
     FILE* file = fopen(scannedFile->file_name, "r");
@@ -218,13 +227,24 @@ void *scanner_work(void *_args){ //funkcija scanner niti
     }
 
 
-    while(1){
+    while (1) {
+
+        while(mapInitialized == 0) {
+            printf("waiting");
+            pthread_cond_wait(&cond, &fileMutex);
+
+        }
+
         pthread_mutex_lock(&fileMutex);
         if (fileChanged(scannedFile->file_name, scannedFile->mod_time) == 8) {
-            // Perform file iteration and mapping again
+
+            scanner_work(scannedFile);
+
             printf("ye");
+
         }
         printf("no");
+
         pthread_mutex_unlock(&fileMutex);
 
         // Sleep for 5 seconds
@@ -244,6 +264,17 @@ void *scanner_work(void *_args){ //funkcija scanner niti
 
 void *map_get_frequency(void* args){
 
+    pthread_mutex_lock(&fileMutex);
+
+    /*
+    // Wait for the fileChanged flag to be set
+    while (!isChanged) {
+        printf("waiting");
+        pthread_cond_wait(&cond, &fileMutex);
+    }
+
+    isChanged = 0;
+     */
 
     hash_map* hashMap = mapFiles[fileCounter].hashMap;
     char* word = (char*) args;
@@ -265,6 +296,9 @@ void *map_get_frequency(void* args){
 
     printf("word is: %s , frequency is %d\n", word, map->frequency);
 
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&fileMutex);
+
     return map;
 
 }
@@ -275,6 +309,11 @@ int main() {
     printf("Command: ");
     gets(input);
 
+    pthread_mutex_init(&fileMutex, NULL);
+    pthread_cond_init(&cond, NULL);
+
+    pthread_t scanTh;
+    pthread_t mapTh;
 
     while(container(input) != -1) {
 
@@ -287,8 +326,6 @@ int main() {
         strcpy(scannedFile.file_name, filePath);
         strcpy(scannedFile.buffer, fileData);
 
-        pthread_t scanTh;
-        pthread_t mapTh;
 
         if (container(input) == 5) {
 
@@ -298,18 +335,22 @@ int main() {
                 return 1;
             }
 
+
+            /*
             // Wait for the thread to finish
             if (pthread_join(scanTh, NULL) != 0) {
                 fprintf(stderr, "Failed to join the thread.\n");
                 return 1;
             }
+             */
 
-            pthread_mutex_destroy(&fileMutex);
+
+            //pthread_mutex_destroy(&fileMutex);
             printf("Contents of the file:\n%s\n", scannedFile.buffer);
 
         } else if(container(input) == 8){
 
-
+            mapInitialized = 1;
 
             if (pthread_create(&mapTh, NULL, map_get_frequency, (void*)&input) != 0) {
                 fprintf(stderr, "Failed to create the thread.\n");
@@ -326,6 +367,13 @@ int main() {
         printf("Command: ");
         gets(input);
     }
+
+    /*
+    if (pthread_join(scanTh, NULL) != 0) {
+        fprintf(stderr, "Failed to join the thread.\n");
+        return 1;
+    }
+     */
 
 
     return 0;
