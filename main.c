@@ -2,6 +2,7 @@
 
 pthread_mutex_t fileMutex;
 pthread_cond_t cond;
+pthread_cond_t cond1;
 int isChanged = 0;
 
 map_file mapFiles[LETTERS];
@@ -90,7 +91,7 @@ void map_add_word_count(char *word, map_result* map, int mapSize){
 
     hash_map* hashMap = mapFiles[fileCounter].hashMap;
 
-    for (int i = 0; i < mapSize; i++) {   /// size of hashmap
+    for (int i = 0; hashMap[i].word != NULL; i++) {
         // Check if the word already exists in the frequency map
         int found = 0;
         for (int j = 0; j < mapSize; j++) {   /// size of freqmap
@@ -138,6 +139,7 @@ int fileChanged(char* fileName, time_t previousTimestamp){
 }
 
 hash_map* hashmapper(char* source){
+
     char helpBuf[BUFFER_SIZE];
     strcpy(helpBuf, source);
 
@@ -180,9 +182,7 @@ hash_map* hashmapper(char* source){
 
 void *scanner_work(void *_args){ //funkcija scanner niti
 
-    if(isChanged == 1){
-        isChanged = 0;
-    }
+    printf("I'm scanning file\n");
 
     scanned_file* scannedFile = (scanned_file*) _args;
 
@@ -226,55 +226,44 @@ void *scanner_work(void *_args){ //funkcija scanner niti
         printf("Word: %s, Hash: %d, Size: %d \n", map[j].word, map[j].hash, map->size);
     }
 
+    if(isChanged == 1){
+        isChanged = 0;
+        pthread_cond_signal(&cond1);
+    }
+
 
     while (1) {
 
         while(mapInitialized == 0) {
-            printf("waiting");
+            printf("waiting\n");
+            printf("intial word: ");
             pthread_cond_wait(&cond, &fileMutex);
-
         }
+        //printf("mod time: %lld\n", scannedFile->mod_time);
 
-        pthread_mutex_lock(&fileMutex);
+
         if (fileChanged(scannedFile->file_name, scannedFile->mod_time) == 8) {
-
             scanner_work(scannedFile);
-
-            printf("ye");
-
         }
-        printf("no");
+        printf("");
 
-        pthread_mutex_unlock(&fileMutex);
+
 
         // Sleep for 5 seconds
         sleep(5);
     }
 
-
-    fclose(file);
-
-
-    // logika za pretragu reci, stavljanje fajla u procitane
-
-
-    return NULL;
 }
 
 
 void *map_get_frequency(void* args){
 
-    pthread_mutex_lock(&fileMutex);
+    printf("usao u frequency\n");
 
-    /*
-    // Wait for the fileChanged flag to be set
-    while (!isChanged) {
-        printf("waiting");
-        pthread_cond_wait(&cond, &fileMutex);
+    if(isChanged == 1){
+        printf("waiting, file has been changed\n");
+        pthread_cond_wait(&cond1, &fileMutex);
     }
-
-    isChanged = 0;
-     */
 
     hash_map* hashMap = mapFiles[fileCounter].hashMap;
     char* word = (char*) args;
@@ -297,7 +286,6 @@ void *map_get_frequency(void* args){
     printf("word is: %s , frequency is %d\n", word, map->frequency);
 
     pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&fileMutex);
 
     return map;
 
@@ -311,6 +299,7 @@ int main() {
 
     pthread_mutex_init(&fileMutex, NULL);
     pthread_cond_init(&cond, NULL);
+    pthread_cond_init(&cond1, NULL);
 
     pthread_t scanTh;
     pthread_t mapTh;
@@ -344,8 +333,6 @@ int main() {
             }
              */
 
-
-            //pthread_mutex_destroy(&fileMutex);
             printf("Contents of the file:\n%s\n", scannedFile.buffer);
 
         } else if(container(input) == 8){
@@ -358,14 +345,18 @@ int main() {
             }
 
             // Wait for the thread to finish
+
             if (pthread_join(mapTh, NULL) != 0) {
                 fprintf(stderr, "Failed to join the thread.\n");
                 return 1;
             }
+
+
         }
 
         printf("Command: ");
         gets(input);
+
     }
 
     /*
