@@ -54,6 +54,7 @@ void putFile(char* filePath, char* input){     // uzima samo poslednje uneto za 
 
     int size = countElements(words);
 
+    //strcpy(filePath, words[1]);
     strcpy(filePath, words[--size]);
 }
 
@@ -117,7 +118,7 @@ int fileChanged(char* fileName, time_t previousTimestamp){
 
     if (stat(fileName, &fileStat) == -1) {
         // Error occurred while getting file information
-        perror("stat");
+        printf("error occured while getting file info\n");
         return -1;
     }
 
@@ -182,8 +183,6 @@ hash_map* hashmapper(char* source){
 
 void *scanner_work(void *_args){ //funkcija scanner niti
 
-    printf("I'm scanning file\n");
-
     scanned_file* scannedFile = (scanned_file*) _args;
 
     FILE* file = fopen(scannedFile->file_name, "r");
@@ -200,7 +199,7 @@ void *scanner_work(void *_args){ //funkcija scanner niti
     // Get the file information
     if (stat(scannedFile->file_name, &fileInfo) == -1) {
         // Error occurred while getting file information
-        perror("stat");
+        printf("no such file or dir");
         return NULL;
     }
 
@@ -222,15 +221,16 @@ void *scanner_work(void *_args){ //funkcija scanner niti
     mapFiles[fileCounter] = mapFile;
 
     // Print the hash_map array
-    for (int j = 0; j < map->size; j++) {
-        printf("Word: %s, Hash: %d, Size: %d \n", map[j].word, map[j].hash, map->size);
-    }
+    //for (int j = 0; j < map->size; j++) {
+        //printf("Word: %s, Hash: %d, Size: %d \n", map[j].word, map[j].hash, map->size);
+    //}
 
     if(isChanged == 1){
         isChanged = 0;
         pthread_cond_signal(&cond1);
     }
 
+    printf("Command: ");
 
     while (1) {
 
@@ -239,22 +239,17 @@ void *scanner_work(void *_args){ //funkcija scanner niti
             printf("intial word: ");
             pthread_cond_wait(&cond, &fileMutex);
         }
-        //printf("mod time: %lld\n", scannedFile->mod_time);
 
 
         if (fileChanged(scannedFile->file_name, scannedFile->mod_time) == 8) {
             scanner_work(scannedFile);
         }
-        printf("");
-
-
 
         // Sleep for 5 seconds
         sleep(5);
     }
 
 }
-
 
 void *map_get_frequency(void* args){
 
@@ -266,7 +261,9 @@ void *map_get_frequency(void* args){
     }
 
     hash_map* hashMap = mapFiles[fileCounter].hashMap;
-    char* word = (char*) args;
+    //char* word = (char*) args;
+    char word[MAX_WORD_LEN];
+    putFile(word, (char*)args);
 
     map_result* map = (map_result*)malloc(BUFFER_SIZE * sizeof(map_result));
     if (map == NULL) {
@@ -309,14 +306,22 @@ int main() {
         char filePath[30];
         char fileData[100];
 
+        /*
         putFile(filePath, input);
 
         scanned_file scannedFile;
         strcpy(scannedFile.file_name, filePath);
         strcpy(scannedFile.buffer, fileData);
+         */
 
 
         if (container(input) == 5) {
+
+            putFile(filePath, input);
+
+            scanned_file scannedFile;
+            strcpy(scannedFile.file_name, filePath);
+            strcpy(scannedFile.buffer, fileData);
 
 
             if (pthread_create(&scanTh, NULL, scanner_work, (void*)&scannedFile) != 0) {

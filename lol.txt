@@ -1,1 +1,7 @@
 example naruto Jiraya naruto kaKashi yee naruto kakashi naruto kakashi
+
+
+OSTAJE DA SE ISPRAVI:
+1. implementacija stop reci
+2. CTRL + D
+3. spisak skeniranih fajlova?
